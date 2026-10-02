@@ -91,3 +91,23 @@ def test_safety_classification_is_not_shown_as_an_answer(monkeypatch):
 
     with install_transport(monkeypatch, handler):
         assert llm.chat("agent", "system", "question") is None
+
+
+def test_groq_uses_supported_reasoning_parameters(monkeypatch):
+    monkeypatch.setenv("LLM_BASE_URL", "https://api.groq.com/openai/v1")
+    monkeypatch.setenv("LLM_MODEL", "openai/gpt-oss-120b")
+
+    def handler(request):
+        assert str(request.url) == "https://api.groq.com/openai/v1/chat/completions"
+        payload = json.loads(request.content)
+        assert payload["model"] == "openai/gpt-oss-120b"
+        assert payload["reasoning_effort"] == "low"
+        assert payload["include_reasoning"] is False
+        assert payload["max_completion_tokens"] == 2048
+        assert "max_tokens" not in payload
+        assert "reasoning" not in payload
+        return httpx.Response(200, json={"choices": [{"finish_reason": "stop", "message": {"content": "Final answer"}}]})
+
+    with httpx.Client(base_url="https://api.groq.com/openai/v1", transport=httpx.MockTransport(handler)) as client:
+        monkeypatch.setattr(llm, "_client", client)
+        assert llm.chat("general", "system", "question", max_tokens=350) == "Final answer"

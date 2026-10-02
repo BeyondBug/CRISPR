@@ -434,6 +434,10 @@ After adding or changing the key in `.env`, run `docker compose up -d backend`
 to load the new configuration. Template answers remain available if the key is
 missing or the provider is unavailable or rate-limited.
 
+For Groq's free tier, set `LLM_BASE_URL=https://api.groq.com/openai/v1`,
+`LLM_MODEL=openai/gpt-oss-120b`, and `LLM_API_KEY` to your Groq key instead.
+Keep API keys in the ignored `.env` file.
+
 ---
 
 ## 🖱️ Usage

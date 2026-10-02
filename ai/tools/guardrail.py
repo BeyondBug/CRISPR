@@ -11,12 +11,13 @@ import re
 from typing import Optional
 
 MONEY_PATTERN = re.compile(
-    r"(?:₹\s*|\brs\.?\s*|\binr\s*)(\d[\d,]*(?:\.\d+)?)\s*(crore|cr|lakh|laks|lakh|l)?"
-    r"|(\d[\d,]*(?:\.\d+)?)\s*(crore|lakh)\b",
+    r"(?:₹\s*|\brs\.?\s*|\binr\s*)(\d[\d,]*(?:\.\d+)?)\s*(crore|cr|lakh|laks|million|billion|thousand|l)?"
+    r"|(\d[\d,]*(?:\.\d+)?)\s*(crore|lakh|million|billion|thousand)\b",
     re.IGNORECASE,
 )
 
-UNIT_MULTIPLIERS = {"crore": 1e7, "cr": 1e7, "lakh": 1e5, "laks": 1e5, "l": 1e5}
+UNIT_MULTIPLIERS = {"crore": 1e7, "cr": 1e7, "lakh": 1e5, "laks": 1e5, "l": 1e5,
+                    "million": 1e6, "billion": 1e9, "thousand": 1e3}
 
 RELATIVE_TOLERANCE = 0.015
 ABSOLUTE_TOLERANCE_INR = 5_000
@@ -83,7 +84,7 @@ def collect_allowed_values(data) -> set[float]:
 def _is_supported(value_inr: float, allowed: set[float]) -> bool:
     for candidate in allowed:
         scale = max(abs(candidate), 1.0)
-        if abs(value_inr - candidate) <= ABSOLUTE_TOLERANCE_INR:
+        if abs(value_inr - candidate) <= min(ABSOLUTE_TOLERANCE_INR, scale * RELATIVE_TOLERANCE):
             return True
         if abs(value_inr - candidate) / scale <= RELATIVE_TOLERANCE:
             return True

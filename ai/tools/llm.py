@@ -104,6 +104,12 @@ def chat(
         }
         if "openrouter.ai" in _settings()[0]:
             payload["reasoning"] = {"enabled": False, "exclude": True}
+        elif "api.groq.com" in _settings()[0] and model.startswith("openai/gpt-oss-"):
+            payload["reasoning_effort"] = "low"
+            payload["include_reasoning"] = False
+            # Groq's limit includes reasoning tokens as well as the answer.
+            payload["max_completion_tokens"] = max(max_tokens, 2048)
+            del payload["max_tokens"]
         try:
             response = get_client().post(
                 "/chat/completions",
