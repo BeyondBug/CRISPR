@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Bot, Send, Sparkles } from 'lucide-react';
 import { queryAssistant } from '../../services/api';
+import AIMessageMarkdown from './AIMessageMarkdown';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -95,7 +96,8 @@ export default function AIAdvisorChat({ theme, suggestions }: Props) {
             key={i}
             style={{
               alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start',
-              maxWidth: '78%',
+              maxWidth: m.role === 'assistant' ? '100%' : '78%',
+              minWidth: 0,
               background: m.role === 'user' ? accent : 'var(--bg-elevated)',
               color: m.role === 'user' ? '#fff' : 'var(--text-primary)',
               borderLeft: m.role === 'assistant' ? `3px solid ${accent}` : 'none',
@@ -105,7 +107,7 @@ export default function AIAdvisorChat({ theme, suggestions }: Props) {
               lineHeight: 1.5,
             }}
           >
-            {m.text}
+            {m.role === 'assistant' ? <AIMessageMarkdown text={m.text} /> : m.text}
           </div>
         ))}
         {loading && (

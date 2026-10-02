@@ -2275,11 +2275,36 @@ table.density-comfortable th {
   color: #fff;
 }
 .ai-drawer-message.assistant {
+  min-width: 0;
   align-self: flex-start;
   background: var(--color-bg-secondary);
   color: var(--color-text-primary);
   border-left: 3px solid var(--color-primary-blue);
 }
+.ai-message-markdown { white-space: normal; overflow-wrap: anywhere; }
+.ai-message-markdown > :first-child { margin-top: 0; }
+.ai-message-markdown > :last-child { margin-bottom: 0; }
+.ai-message-markdown p { margin: 8px 0; line-height: 1.65; }
+.ai-message-markdown h1, .ai-message-markdown h2, .ai-message-markdown h3, .ai-message-markdown h4, .ai-message-markdown h5, .ai-message-markdown h6 { margin: 16px 0 8px; font-size: 1em; font-weight: 700; line-height: 1.4; }
+.ai-message-markdown h1 { font-size: 1.25em; }
+.ai-message-markdown h2 { font-size: 1.15em; }
+.ai-message-markdown ul, .ai-message-markdown ol { margin: 8px 0; padding-left: 22px; }
+.ai-message-markdown ul { list-style: disc; }
+.ai-message-markdown ol { list-style: decimal; }
+.ai-message-markdown li { margin: 4px 0; }
+.ai-message-markdown li > p { margin: 4px 0; }
+.ai-message-markdown blockquote { margin: 10px 0; padding-left: 12px; border-left: 3px solid var(--color-primary-blue); color: var(--text-muted); }
+.ai-message-markdown a { color: var(--color-primary-blue); text-decoration: underline; }
+.ai-message-markdown code { padding: 2px 4px; border-radius: 4px; background: var(--bg-elevated); font-family: monospace; font-size: .92em; }
+.ai-message-markdown pre { max-width: 100%; overflow-x: auto; margin: 10px 0; padding: 12px; border: 1px solid var(--bg-border); border-radius: 6px; background: var(--bg-elevated); white-space: pre; }
+.ai-message-markdown pre code { padding: 0; background: none; overflow-wrap: normal; }
+.ai-markdown-table { max-width: 100%; overflow-x: auto; margin: 10px 0; }
+.ai-message-markdown table { width: 100%; border-collapse: collapse; font-size: .92em; }
+.ai-message-markdown th, .ai-message-markdown td { padding: 8px; border: 1px solid var(--bg-border); text-align: left; vertical-align: top; }
+.ai-message-markdown th { background: var(--bg-elevated); font-weight: 700; }
+.ai-message-markdown hr { margin: 14px 0; border: 0; border-top: 1px solid var(--bg-border); }
+.ai-message-markdown .contains-task-list { list-style: none; padding-left: 0; }
+.ai-message-markdown input[type=checkbox] { margin-right: 6px; }
 .ai-drawer-input-row {
   display: flex;
   gap: 8px;

@@ -77,6 +77,7 @@ jobs:
       run: |
         npm ci
         npm run test:attack-paths
+        npm run test:ai-markdown
         npm run build
 
     - name: Docker build
