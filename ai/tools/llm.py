@@ -3,14 +3,16 @@
 Talks to an OpenAI-compatible model API. Configuration
 comes from environment variables loaded from .env:
 
-    LLM_BASE_URL  (default: the team router)
+    LLM_BASE_URL  (default: https://openrouter.ai/api/v1)
     LLM_API_KEY   (required for LLM features)
+    LLM_MODEL     (default: inclusionai/ling-3.0-flash-sante:free)
     LLM_ENABLED   (set to 'false' to force template-only answers)
 
 The advisor NEVER depends on this module being reachable — every caller
 must fall back to deterministic templates when chat() returns None.
 """
 
+import logging
 import os
 import time
 from typing import Optional
@@ -20,26 +22,13 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-DEFAULT_BASE_URL = "http://98.94.73.175:20128/v1"
+DEFAULT_BASE_URL = "https://openrouter.ai/api/v1"
+DEFAULT_MODEL = "inclusionai/ling-3.0-flash-sante:free"
 REQUEST_TIMEOUT_S = 90.0
 AVAILABILITY_TIMEOUT_S = 25.0
 AVAILABILITY_TTL_S = 60.0
 
-MODEL_REGISTRY = {
-    "route": "kr/gpt-5.6-sol",
-    "general": "kr/gpt-5.6-sol",
-    "explain": "kr/claude-opus-5-thinking",
-    "agent": "kr/claude-opus-5-thinking-agentic",
-    "mitigate": "kr/gpt-5.6-sol-thinking",
-}
-
-MODEL_FALLBACKS = {
-    "route": ["kr/gpt-5.6-terra", "kr/gpt-5.6-luna"],
-    "general": ["kr/claude-opus-5", "kr/gpt-5.6-terra"],
-    "explain": ["kr/claude-opus-5", "kr/gpt-5.6-sol-thinking"],
-    "agent": ["kr/claude-opus-5-agentic", "kr/gpt-5.6-sol-thinking-agentic"],
-    "mitigate": ["kr/claude-opus-5-thinking", "kr/gpt-5.6-sol"],
-}
+logger = logging.getLogger(__name__)
 
 _client: Optional[httpx.Client] = None
 _last_availability_check: float = 0.0
@@ -47,7 +36,7 @@ _available: bool = False
 
 
 def _settings() -> tuple[str, str, bool]:
-    base_url = os.environ.get("LLM_BASE_URL", DEFAULT_BASE_URL).rstrip("/")
+    base_url = (os.environ.get("LLM_BASE_URL", "").strip() or DEFAULT_BASE_URL).rstrip("/")
     api_key = os.environ.get("LLM_API_KEY", "")
     enabled = os.environ.get("LLM_ENABLED", "true").strip().lower() != "false"
     return base_url, api_key, enabled
@@ -66,8 +55,8 @@ def get_client() -> httpx.Client:
 
 def is_available(force_check: bool = False) -> bool:
     global _last_availability_check, _available
-    _, _, enabled = _settings()
-    if not enabled:
+    _, api_key, enabled = _settings()
+    if not enabled or not api_key:
         return False
     now = time.monotonic()
     if not force_check and (now - _last_availability_check) < AVAILABILITY_TTL_S:
@@ -90,7 +79,7 @@ def chat(
     request_timeout_s: float = REQUEST_TIMEOUT_S,
     max_attempts: Optional[int] = None,
 ) -> Optional[str]:
-    """Generate a completion with the task-appropriate model.
+    """Generate a completion with the configured model for every advisor task.
 
     Returns None on any failure (router down, key missing, timeout) so
     callers can fall back to deterministic templates.
@@ -98,8 +87,8 @@ def chat(
     _, api_key, enabled = _settings()
     if not enabled or not api_key:
         return None
-    primary = MODEL_REGISTRY.get(task, MODEL_REGISTRY["explain"])
-    models = [primary, *MODEL_FALLBACKS.get(task, MODEL_FALLBACKS["explain"])]
+    # Use a specific assistant model; never select the random free router.
+    models = [os.environ.get("LLM_MODEL", "").strip() or DEFAULT_MODEL]
     if max_attempts is not None:
         models = models[:max_attempts]
     for model in dict.fromkeys(models):
@@ -113,6 +102,8 @@ def chat(
             "temperature": temperature,
             "stream": False,
         }
+        if "openrouter.ai" in _settings()[0]:
+            payload["reasoning"] = {"enabled": False, "exclude": True}
         try:
             response = get_client().post(
                 "/chat/completions",
@@ -122,11 +113,20 @@ def chat(
             )
             response.raise_for_status()
             body = response.json()
-            content = body["choices"][0]["message"]["content"]
+            choice = body["choices"][0]
+            if choice.get("finish_reason") == "length":
+                logger.warning("LLM completion truncated (model=%s)", model)
+                continue
+            content = choice["message"]["content"]
             if isinstance(content, str) and content.strip():
+                if content.strip().lower().startswith(("user safety:", "safety classification:")):
+                    logger.warning("LLM returned a safety classification instead of an answer (model=%s)", model)
+                    continue
                 return content.strip()
-        except Exception:
-            continue
+        except httpx.HTTPStatusError as error:
+            logger.warning("LLM request failed (model=%s, status=%s)", model, error.response.status_code)
+        except Exception as error:
+            logger.warning("LLM request failed (model=%s, error=%s)", model, type(error).__name__)
     return None
 
 

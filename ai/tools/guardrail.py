@@ -11,8 +11,8 @@ import re
 from typing import Optional
 
 MONEY_PATTERN = re.compile(
-    r"(?:₹\s*|rs\.?\s*|inr\s*)([\d,]+(?:\.\d+)?)\s*(crore|cr|lakh|laks|lakh|l)?"
-    r"|([\d,]+(?:\.\d+)?)\s*(crore|lakh)\b",
+    r"(?:₹\s*|\brs\.?\s*|\binr\s*)(\d[\d,]*(?:\.\d+)?)\s*(crore|cr|lakh|laks|lakh|l)?"
+    r"|(\d[\d,]*(?:\.\d+)?)\s*(crore|lakh)\b",
     re.IGNORECASE,
 )
 

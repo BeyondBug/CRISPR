@@ -525,6 +525,7 @@ def _answer_full_analysis(question: str, organization_id=None) -> tuple[str, dic
     data = {
         "enterprise": enterprise,
         "top_risks": top_risks,
+        "top_risks_total_eal_inr": sum(row.get("eal_inr", 0) for row in top_risks),
         "asset_count": len(assets),
         "internet_exposed_assets": sum(bool(asset.get("internet_facing")) for asset in assets),
         "finding_counts": {
