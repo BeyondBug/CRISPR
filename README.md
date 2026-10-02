@@ -436,6 +436,10 @@ missing or the provider is unavailable or rate-limited.
 
 For Groq's free tier, set `LLM_BASE_URL=https://api.groq.com/openai/v1`,
 `LLM_MODEL=openai/gpt-oss-120b`, and `LLM_API_KEY` to your Groq key instead.
+To use OpenRouter as a backup after Groq, also set `OPENROUTER_API_KEY` and
+optionally `OPENROUTER_MODEL` (defaults to the free Ling chat model). Requests
+try the primary provider, then OpenRouter, then template answers. Timeouts,
+rate limits, malformed responses, and rejected financial claims trigger failover.
 Keep API keys in the ignored `.env` file.
 
 ---

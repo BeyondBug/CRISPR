@@ -29,6 +29,8 @@ services:
       - LLM_MODEL=${LLM_MODEL:-inclusionai/ling-3.0-flash-sante:free}
       - LLM_API_KEY=${LLM_API_KEY:-}
       - LLM_ENABLED=${LLM_ENABLED:-false}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - OPENROUTER_MODEL=${OPENROUTER_MODEL:-inclusionai/ling-3.0-flash-sante:free}
       - CRISPR_DATA_MODE=${CRISPR_DATA_MODE:-live}
       - DEMO_AUTO_SEED=${DEMO_AUTO_SEED:-false}
       - NVD_API_KEY=${NVD_API_KEY:-}

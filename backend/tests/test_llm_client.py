@@ -14,7 +14,10 @@ def configure(monkeypatch):
     monkeypatch.setenv("LLM_API_KEY", "test-key")
     monkeypatch.setenv("LLM_BASE_URL", "https://openrouter.ai/api/v1")
     monkeypatch.delenv("LLM_MODEL", raising=False)
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    monkeypatch.delenv("OPENROUTER_MODEL", raising=False)
     monkeypatch.setattr(llm, "_client", None)
+    monkeypatch.setattr(llm, "_backup_client", None)
     monkeypatch.setattr(llm, "_last_availability_check", 0)
 
 
@@ -111,3 +114,72 @@ def test_groq_uses_supported_reasoning_parameters(monkeypatch):
     with httpx.Client(base_url="https://api.groq.com/openai/v1", transport=httpx.MockTransport(handler)) as client:
         monkeypatch.setattr(llm, "_client", client)
         assert llm.chat("general", "system", "question", max_tokens=350) == "Final answer"
+
+
+@pytest.mark.parametrize("failure", [401, 429, 503, "timeout", "invalid", "truncated", "classification", "financial"])
+def test_groq_failure_tries_openrouter_with_separate_credentials(monkeypatch, failure):
+    monkeypatch.setenv("LLM_BASE_URL", "https://api.groq.com/openai/v1")
+    monkeypatch.setenv("LLM_MODEL", "openai/gpt-oss-120b")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "backup-key")
+    calls = []
+
+    def handler(request):
+        calls.append(request.url.host)
+        payload = json.loads(request.content)
+        if request.url.host == "api.groq.com":
+            assert request.headers["Authorization"] == "Bearer test-key"
+            if failure == "timeout":
+                raise httpx.ReadTimeout("Timeout", request=request)
+            if failure == "invalid":
+                return httpx.Response(200, json={"choices": []})
+            if failure == "truncated":
+                return httpx.Response(200, json={"choices": [{"finish_reason": "length", "message": {"content": "Partial"}}]})
+            if failure in ("classification", "financial"):
+                text = "User Safety: safe" if failure == "classification" else "Unsupported amount"
+                return httpx.Response(200, json={"choices": [{"message": {"content": text}}]})
+            return httpx.Response(failure, json={"error": {"message": "Unavailable"}})
+        assert request.url.host == "openrouter.ai"
+        assert request.headers["Authorization"] == "Bearer backup-key"
+        assert payload["model"] == llm.DEFAULT_MODEL
+        assert "reasoning_effort" not in payload
+        assert payload["reasoning"]["exclude"] is True
+        return httpx.Response(200, json={"choices": [{"message": {"content": "Backup answer"}}]})
+
+    transport = httpx.MockTransport(handler)
+    with httpx.Client(base_url="https://api.groq.com/openai/v1", transport=transport) as primary, httpx.Client(base_url=llm.DEFAULT_BASE_URL, transport=transport) as backup:
+        monkeypatch.setattr(llm, "_client", primary)
+        monkeypatch.setattr(llm, "_backup_client", backup)
+        assert llm.chat("explain", "system", "question", validate_answer=lambda text: text != "Unsupported amount") == "Backup answer"
+    assert calls == ["api.groq.com", "openrouter.ai"]
+
+
+def test_both_providers_fail_returns_template_signal(monkeypatch):
+    monkeypatch.setenv("LLM_BASE_URL", "https://api.groq.com/openai/v1")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "backup-key")
+    hosts = []
+
+    def handler(request):
+        hosts.append(request.url.host)
+        return httpx.Response(503)
+
+    transport = httpx.MockTransport(handler)
+    with httpx.Client(base_url="https://api.groq.com/openai/v1", transport=transport) as primary, httpx.Client(base_url=llm.DEFAULT_BASE_URL, transport=transport) as backup:
+        monkeypatch.setattr(llm, "_client", primary)
+        monkeypatch.setattr(llm, "_backup_client", backup)
+        assert llm.chat("general", "system", "question") is None
+    assert hosts == ["api.groq.com", "openrouter.ai"]
+
+
+def test_missing_primary_key_still_allows_backup(monkeypatch):
+    monkeypatch.setenv("LLM_BASE_URL", "https://api.groq.com/openai/v1")
+    monkeypatch.setenv("LLM_API_KEY", "")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "backup-key")
+    assert llm.is_available()
+    assert llm._providers() == [(llm.DEFAULT_BASE_URL, "backup-key", llm.DEFAULT_MODEL)]
+
+
+def test_disabled_llm_disables_both_providers(monkeypatch):
+    monkeypatch.setenv("LLM_ENABLED", "false")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "backup-key")
+    assert not llm.is_available()
+    assert llm.chat("general", "system", "question") is None

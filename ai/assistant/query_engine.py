@@ -216,6 +216,7 @@ def _answer_general(question: str) -> tuple[str, dict, str]:
         temperature=0.2,
         request_timeout_s=25.0,
         max_attempts=2,
+        validate_answer=lambda text: guardrail_validate(text, {})["ok"],
     )
     if not llm_answer:
         return fallback, {}, "template"
@@ -601,6 +602,7 @@ def _polish_with_llm(intent: str, question: str, data: dict) -> tuple[str | None
         return None, []
     raw = chat(
         task=task,
+        validate_answer=lambda text: guardrail_validate(text, data)["ok"],
         system=SYSTEM_PROMPT,
         user=f"Question: {question}\n\nENGINE DATA (the ONLY figures you may cite):\n{facts}",
     )
