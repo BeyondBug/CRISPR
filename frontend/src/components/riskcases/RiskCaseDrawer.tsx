@@ -135,7 +135,7 @@ export default function RiskCaseDrawer({ riskCase, open, onClose }: Props) {
           <div>
             <div className="card-title">Correlated Sources</div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              {riskCase.sources.map((s) => (
+              {(riskCase.sources ?? []).map((s) => (
                 <SourcePill key={s} source={s} />
               ))}
             </div>

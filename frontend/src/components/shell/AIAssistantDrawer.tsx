@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { X, Bot, Send, Sparkles, ShieldAlert, Globe, TrendingUp, ScrollText } from 'lucide-react';
 import { useUiStore, closeAIDrawer } from '../../lib/uiStore';
 import { queryAssistant } from '../../services/api';
+import AIMessageMarkdown from '../common/AIMessageMarkdown';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -270,7 +271,7 @@ export default function AIAssistantDrawer() {
           )}
           {messages.map((m, i) => (
             <div key={i} className={`ai-drawer-message ${m.role}`}>
-              {m.text}
+              {m.role === 'assistant' ? <AIMessageMarkdown text={m.text} /> : m.text}
               {!!m.references?.length && (
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
                   {m.references.map((reference) => (

@@ -313,6 +313,8 @@ export interface AttackPath {
   risk_score?: number;
   confidence?: number;
   financial_impact_inr?: number;
+  demo?: boolean;
+  scenario_summary?: string;
 }
 
 // ----------------------------------------------------------------------------

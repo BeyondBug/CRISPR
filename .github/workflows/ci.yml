@@ -61,14 +61,23 @@ jobs:
     - name: Run Tests
       run: |
         alembic upgrade head
-        test "$(alembic current | awk '{print $1}')" = "0008_remediation_delivery_risk"
+        test "$(alembic current | awk '{print $1}' | sort)" = "$(alembic heads | awk '{print $1}' | sort)"
         python -c "from backend.ingestion.store import refresh_demo_sources; print(refresh_demo_sources())"
         pytest backend/ -q
 
-    - name: Build frontend
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: "22"
+        cache: npm
+        cache-dependency-path: frontend/package-lock.json
+
+    - name: Test and build frontend
       working-directory: frontend
       run: |
         npm ci
+        npm run test:attack-paths
+        npm run test:ai-markdown
         npm run build
 
     - name: Docker build

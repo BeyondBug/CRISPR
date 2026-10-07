@@ -6,34 +6,110 @@ from backend.database.connection import get_connection
 from backend.services.neo4j_graph import project_and_traverse
 
 
+def _demo_edge(edge_id, source, target, relation, source_kind, target_kind, confidence, impact=0):
+    return {
+        "external_edge_id": f"demo-{edge_id}", "source_name": "SIH online-store demo",
+        "source_node": source, "target_node": target, "relation_type": relation,
+        "source_kind": source_kind, "target_kind": target_kind, "confidence": confidence,
+        "evidence": {"financial_impact_inr": impact} if impact else {},
+    }
+
+
+# One fictional online store, with shared resources and eight business targets.
+# These are illustrative relationship records, never substitutes for live evidence.
 DEMO_EDGES = [
-    {"external_edge_id": "demo-1", "source_name": "SIH demo", "source_node": "Internet", "target_node": "Public API Gateway", "relation_type": "internet exposed", "source_kind": "INTERNET", "target_kind": "API", "confidence": .98, "evidence": {}},
-    {"external_edge_id": "demo-2", "source_name": "SIH demo", "source_node": "Public API Gateway", "target_node": "Authentication Service", "relation_type": "routes traffic", "source_kind": "API", "target_kind": "COMPUTE", "confidence": .94, "evidence": {}},
-    {"external_edge_id": "demo-3", "source_name": "SIH demo", "source_node": "Authentication Service", "target_node": "CVE-2025 Auth Bypass", "relation_type": "exploitable finding", "source_kind": "COMPUTE", "target_kind": "VULNERABILITY", "confidence": .91, "evidence": {}},
-    {"external_edge_id": "demo-4", "source_name": "SIH demo", "source_node": "CVE-2025 Auth Bypass", "target_node": "Privileged IAM Role", "relation_type": "assumes role", "source_kind": "VULNERABILITY", "target_kind": "IDENTITY", "confidence": .89, "evidence": {}},
-    {"external_edge_id": "demo-5", "source_name": "SIH demo", "source_node": "Privileged IAM Role", "target_node": "Payment Service", "relation_type": "admin access", "source_kind": "IDENTITY", "target_kind": "COMPUTE", "confidence": .87, "evidence": {}},
-    {"external_edge_id": "demo-6", "source_name": "SIH demo", "source_node": "Payment Service", "target_node": "Payment Database", "relation_type": "reads and writes", "source_kind": "COMPUTE", "target_kind": "CRITICAL_ASSET", "confidence": .86, "evidence": {"financial_impact_inr": 78500000}},
-    {"external_edge_id": "demo-7", "source_name": "SIH demo", "source_node": "Public API Gateway", "target_node": "Legacy Admin Portal", "relation_type": "legacy route", "source_kind": "API", "target_kind": "API", "confidence": .83, "evidence": {}},
-    {"external_edge_id": "demo-8", "source_name": "SIH demo", "source_node": "Legacy Admin Portal", "target_node": "Customer Data Lake", "relation_type": "export permission", "source_kind": "API", "target_kind": "CROWN_JEWEL", "confidence": .79, "evidence": {"financial_impact_inr": 124000000}},
-    {"external_edge_id": "demo-9", "source_name": "SIH demo", "source_node": "Internet", "target_node": "Corporate VPN", "relation_type": "remote access", "source_kind": "INTERNET", "target_kind": "API", "confidence": .93, "evidence": {}},
-    {"external_edge_id": "demo-10", "source_name": "SIH demo", "source_node": "Corporate VPN", "target_node": "Bastion Host", "relation_type": "stolen session", "source_kind": "API", "target_kind": "COMPUTE", "confidence": .84, "evidence": {}},
-    {"external_edge_id": "demo-11", "source_name": "SIH demo", "source_node": "Bastion Host", "target_node": "Kubernetes Control Plane", "relation_type": "admin network access", "source_kind": "COMPUTE", "target_kind": "COMPUTE", "confidence": .82, "evidence": {}},
-    {"external_edge_id": "demo-12", "source_name": "SIH demo", "source_node": "Kubernetes Control Plane", "target_node": "Secrets Vault", "relation_type": "service token access", "source_kind": "COMPUTE", "target_kind": "CROWN_JEWEL", "confidence": .78, "evidence": {"financial_impact_inr": 92000000}},
-    {"external_edge_id": "demo-13", "source_name": "SIH demo", "source_node": "Bastion Host", "target_node": "Admin Workstation", "relation_type": "remote desktop", "source_kind": "COMPUTE", "target_kind": "COMPUTE", "confidence": .76, "evidence": {}},
-    {"external_edge_id": "demo-14", "source_name": "SIH demo", "source_node": "Admin Workstation", "target_node": "Domain Controller", "relation_type": "credential reuse", "source_kind": "COMPUTE", "target_kind": "CRITICAL_ASSET", "confidence": .72, "evidence": {"financial_impact_inr": 68000000}},
-    {"external_edge_id": "demo-15", "source_name": "SIH demo", "source_node": "Internet", "target_node": "Email Gateway", "relation_type": "phishing delivery", "source_kind": "INTERNET", "target_kind": "API", "confidence": .90, "evidence": {}},
-    {"external_edge_id": "demo-16", "source_name": "SIH demo", "source_node": "Email Gateway", "target_node": "Finance Endpoint", "relation_type": "malicious attachment", "source_kind": "API", "target_kind": "COMPUTE", "confidence": .81, "evidence": {}},
-    {"external_edge_id": "demo-17", "source_name": "SIH demo", "source_node": "Finance Endpoint", "target_node": "ERP Service Account", "relation_type": "token theft", "source_kind": "COMPUTE", "target_kind": "IDENTITY", "confidence": .75, "evidence": {}},
-    {"external_edge_id": "demo-18", "source_name": "SIH demo", "source_node": "ERP Service Account", "target_node": "ERP Application", "relation_type": "privileged login", "source_kind": "IDENTITY", "target_kind": "COMPUTE", "confidence": .73, "evidence": {}},
-    {"external_edge_id": "demo-19", "source_name": "SIH demo", "source_node": "ERP Application", "target_node": "Finance Records", "relation_type": "database write", "source_kind": "COMPUTE", "target_kind": "CROWN_JEWEL", "confidence": .71, "evidence": {"financial_impact_inr": 101000000}},
-    {"external_edge_id": "demo-20", "source_name": "SIH demo", "source_node": "Internet", "target_node": "CI/CD Runner", "relation_type": "public webhook", "source_kind": "INTERNET", "target_kind": "COMPUTE", "confidence": .88, "evidence": {}},
-    {"external_edge_id": "demo-21", "source_name": "SIH demo", "source_node": "CI/CD Runner", "target_node": "Cloud Deploy Credentials", "relation_type": "secret exposure", "source_kind": "COMPUTE", "target_kind": "IDENTITY", "confidence": .85, "evidence": {}},
-    {"external_edge_id": "demo-22", "source_name": "SIH demo", "source_node": "Cloud Deploy Credentials", "target_node": "Production Kubernetes", "relation_type": "cluster admin", "source_kind": "IDENTITY", "target_kind": "COMPUTE", "confidence": .83, "evidence": {}},
-    {"external_edge_id": "demo-23", "source_name": "SIH demo", "source_node": "Production Kubernetes", "target_node": "Container Registry", "relation_type": "image push", "source_kind": "COMPUTE", "target_kind": "CRITICAL_ASSET", "confidence": .80, "evidence": {"financial_impact_inr": 54000000}},
-    {"external_edge_id": "demo-24", "source_name": "SIH demo", "source_node": "Production Kubernetes", "target_node": "Customer Object Storage", "relation_type": "workload identity", "source_kind": "COMPUTE", "target_kind": "CROWN_JEWEL", "confidence": .77, "evidence": {"financial_impact_inr": 116000000}},
-    {"external_edge_id": "demo-25", "source_name": "SIH demo", "source_node": "Domain Controller", "target_node": "Backup Management", "relation_type": "domain admin access", "source_kind": "CRITICAL_ASSET", "target_kind": "COMPUTE", "confidence": .69, "evidence": {}},
-    {"external_edge_id": "demo-26", "source_name": "SIH demo", "source_node": "Backup Management", "target_node": "Immutable Backups", "relation_type": "backup policy control", "source_kind": "COMPUTE", "target_kind": "CROWN_JEWEL", "confidence": .66, "evidence": {"financial_impact_inr": 88000000}},
+    _demo_edge(1, "Internet", "Public Store API", "publicly reachable", "INTERNET", "API", .98),
+    _demo_edge(2, "Public Store API", "Exposed API Credential", "credential exposed", "API", "VULNERABILITY", .95),
+    _demo_edge(3, "Exposed API Credential", "Store Service Account", "authenticates as", "VULNERABILITY", "IDENTITY", .94),
+    _demo_edge(4, "Store Service Account", "Customer Orders Database", "can read customer orders", "IDENTITY", "CRITICAL_ASSET", .93, 78500000),
+    _demo_edge(5, "Store Service Account", "Payment Processing Service", "can manage payments", "IDENTITY", "COMPUTE", .90),
+    _demo_edge(6, "Payment Processing Service", "Payment Records", "can read and update payments", "COMPUTE", "CRITICAL_ASSET", .89, 101000000),
+    _demo_edge(7, "Store Service Account", "Customer Export Bucket", "can download customer exports", "IDENTITY", "CROWN_JEWEL", .87, 124000000),
+    _demo_edge(8, "Public Store API", "Customer Support Portal", "routes support requests", "API", "API", .88),
+    _demo_edge(9, "Customer Support Portal", "Support Service Account", "uses support account", "API", "IDENTITY", .86),
+    _demo_edge(10, "Support Service Account", "Customer Profiles", "can view customer profiles", "IDENTITY", "CROWN_JEWEL", .84, 68000000),
+    _demo_edge(11, "Internet", "Store Admin Login", "publicly reachable", "INTERNET", "API", .92),
+    _demo_edge(12, "Store Admin Login", "Missing Admin MFA", "missing second factor", "API", "VULNERABILITY", .88),
+    _demo_edge(13, "Missing Admin MFA", "Store Administrator", "password-only access", "VULNERABILITY", "IDENTITY", .85),
+    _demo_edge(14, "Store Administrator", "Order Fulfillment Service", "can manage fulfillment", "IDENTITY", "COMPUTE", .83),
+    _demo_edge(15, "Order Fulfillment Service", "Warehouse Orders", "can change delivery orders", "COMPUTE", "CRITICAL_ASSET", .81, 54000000),
+    _demo_edge(16, "Store Administrator", "Product Pricing Catalog", "can change product prices", "IDENTITY", "CRITICAL_ASSET", .79, 62000000),
+    _demo_edge(17, "Internet", "Supplier Upload Portal", "accepts supplier uploads", "INTERNET", "API", .86),
+    _demo_edge(18, "Supplier Upload Portal", "Unvalidated Uploads", "upload validation gap", "API", "VULNERABILITY", .80),
+    _demo_edge(19, "Unvalidated Uploads", "Inventory Import Worker", "files processed by", "VULNERABILITY", "COMPUTE", .76),
+    _demo_edge(20, "Inventory Import Worker", "Inventory Database", "can update stock levels", "COMPUTE", "CRITICAL_ASSET", .74, 92000000),
+    _demo_edge(21, "Internet", "Store Deployment Webhook", "public deployment endpoint", "INTERNET", "API", .85),
+    _demo_edge(22, "Store Deployment Webhook", "Exposed Deployment Token", "deployment token exposed", "API", "VULNERABILITY", .79),
+    _demo_edge(23, "Exposed Deployment Token", "Deployment Service Account", "authenticates as", "VULNERABILITY", "IDENTITY", .75),
+    _demo_edge(24, "Deployment Service Account", "Production Store Backend", "can deploy application", "IDENTITY", "COMPUTE", .72),
+    _demo_edge(25, "Production Store Backend", "Backup Export Service", "uses backup service", "COMPUTE", "COMPUTE", .70),
+    _demo_edge(26, "Backup Export Service", "Store Backup Bucket", "can read store backups", "COMPUTE", "CROWN_JEWEL", .68, 88000000),
 ]
+
+DEMO_NODE_DESCRIPTIONS = {
+    "Internet": "An outsider starts outside the store's trusted environment. This example illustrates possible reachability, not an attack in progress.",
+    "Public Store API": "The storefront's public API accepts customer requests. In this fictional example, an API credential is exposed here.",
+    "Exposed API Credential": "A leaked API key could be reused until it is revoked. Rotate the key and remove the source of exposure to interrupt this route.",
+    "Store Service Account": "The store's application identity has more access than it needs: orders, payments, and customer exports. A stolen key could inherit those permissions.",
+    "Customer Orders Database": "Customer names, delivery addresses, and order history. An outsider using the service account could read these records; narrow the account's permissions.",
+    "Payment Processing Service": "Processes the store's payments. The same service account can manage it, creating a second potential branch from the exposed key.",
+    "Payment Records": "Payment and refund records. Excessive service access could allow unauthorized reading or changes, affecting revenue and reconciliation.",
+    "Customer Export Bucket": "Files containing customer exports. Download permission on the shared service account could expose many customers at once.",
+    "Customer Support Portal": "Support requests are routed from the store API to this portal. Confirm authentication and authorization before treating the connection as exploitable.",
+    "Support Service Account": "The support portal's identity can view customer profiles. Restrict its access to the records required for support.",
+    "Customer Profiles": "Customer contact details and profile information. A compromised support identity could expose these records.",
+    "Store Admin Login": "The store's administration sign-in is reachable from the Internet. Public reachability alone does not establish unauthorized access.",
+    "Missing Admin MFA": "The fictional admin login lacks a second factor. A stolen password could be sufficient to sign in; enforcing MFA would interrupt this route.",
+    "Store Administrator": "An administrative identity can control fulfillment and product prices. Limit privileges and protect sign-in with MFA.",
+    "Order Fulfillment Service": "Schedules delivery orders for the warehouse. Administrative access could allow disruption or fraudulent changes.",
+    "Warehouse Orders": "Delivery instructions and fulfillment records. Unauthorized changes could delay orders or redirect shipments.",
+    "Product Pricing Catalog": "Product prices used by the storefront. An unauthorized administrator could change prices and affect revenue.",
+    "Supplier Upload Portal": "Suppliers submit stock files here. The entry route depends on the supplier authentication and upload controls actually in place.",
+    "Unvalidated Uploads": "The fictional upload flow lacks content validation. A harmful file could reach the inventory import process; validate and isolate incoming files.",
+    "Inventory Import Worker": "Processes supplier files and updates inventory. Assess whether a harmful upload could affect this worker before assuming exploitation.",
+    "Inventory Database": "Stock levels used to accept and fulfill orders. Excessive worker permissions could allow unauthorized changes and disrupt sales.",
+    "Store Deployment Webhook": "A public endpoint triggers deployment workflows. Verify its authentication and scope before assuming an outsider can use it.",
+    "Exposed Deployment Token": "A leaked deployment token could be reused to authenticate as the deployment account. Revoke it and remove the exposure.",
+    "Deployment Service Account": "The deployment identity can release the store application. Scope the token and account to the minimum required deployment actions.",
+    "Production Store Backend": "Runs the store application and connects to the backup workflow. A compromised deployment could potentially affect this service.",
+    "Backup Export Service": "Exports backups for the store backend. Restrict which workloads can use it and audit backup access.",
+    "Store Backup Bucket": "Backup copies of store data. A compromised backup service could expose records beyond the production database.",
+}
+
+DEMO_SCENARIOS = {
+    "Customer Orders Database": (
+        "Exposed API key → Customer orders",
+        "An exposed API key could let an outsider use an overprivileged service account to read customer orders. Rotating the key and narrowing the account's permissions would break this route.",
+    ),
+    "Payment Records": (
+        "Exposed API key → Payment records",
+        "The same exposed API key could also grant access to the payment service and its records. Rotate the key and remove unnecessary payment permissions from the shared account.",
+    ),
+    "Customer Export Bucket": (
+        "Exposed API key → Customer exports",
+        "The shared service account can download customer exports. An outsider reusing its exposed key could reach those files; revoke the key and restrict export access.",
+    ),
+    "Customer Profiles": (
+        "Support access → Customer profiles",
+        "The public store API connects to the support portal and its customer-profile access. Validate each authentication boundary before treating this route as exploitable, and limit the support account's permissions.",
+    ),
+    "Warehouse Orders": (
+        "Missing admin MFA → Delivery orders",
+        "A stolen admin password could allow access without a second factor and lead to delivery-order changes. Require MFA and limit administrative fulfillment permissions.",
+    ),
+    "Product Pricing Catalog": (
+        "Missing admin MFA → Product prices",
+        "The same password-only administrative access could allow product-price changes. Enforcing MFA and separating pricing privileges would interrupt this route.",
+    ),
+    "Inventory Database": (
+        "Unsafe supplier upload → Inventory",
+        "An unvalidated supplier file could reach the inventory worker and potentially affect stock records. Validate uploads, isolate processing, and restrict the worker's database permissions.",
+    ),
+    "Store Backup Bucket": (
+        "Exposed deployment token → Store backups",
+        "A reused deployment token could affect the production application and potentially its backup access. Revoke the token, restrict deployment privileges, and separate backup permissions.",
+    ),
+}
 
 
 def _node_type(kind: str) -> str:
@@ -125,4 +201,13 @@ def calculate_attack_paths(organization_id, max_depth: int = 8, demo: bool = Fal
     response["provenance"] = "bundled SIH demo relationship evidence" if demo else "current organization-supplied relationship evidence"
     response["edge_count"] = len(rows)
     response["limitations"] = ["Reachability is evidence-based and does not prove exploitability", "Missing edges produce incomplete paths rather than synthetic links"]
+    if demo:
+        response["demo"] = True
+        for path in response["paths"]:
+            path["demo"] = True
+            title, summary = DEMO_SCENARIOS.get(path["nodes"][-1]["label"], (path["title"], ""))
+            path["title"] = title
+            path["scenario_summary"] = summary
+            for node in path["nodes"]:
+                node["description"] = DEMO_NODE_DESCRIPTIONS.get(node["id"], "")
     return response

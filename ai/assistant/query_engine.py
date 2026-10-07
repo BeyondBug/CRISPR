@@ -216,6 +216,7 @@ def _answer_general(question: str) -> tuple[str, dict, str]:
         temperature=0.2,
         request_timeout_s=25.0,
         max_attempts=2,
+        validate_answer=lambda text: guardrail_validate(text, {})["ok"],
     )
     if not llm_answer:
         return fallback, {}, "template"
@@ -525,6 +526,7 @@ def _answer_full_analysis(question: str, organization_id=None) -> tuple[str, dic
     data = {
         "enterprise": enterprise,
         "top_risks": top_risks,
+        "top_risks_total_eal_inr": sum(row.get("eal_inr", 0) for row in top_risks),
         "asset_count": len(assets),
         "internet_exposed_assets": sum(bool(asset.get("internet_facing")) for asset in assets),
         "finding_counts": {
@@ -600,6 +602,7 @@ def _polish_with_llm(intent: str, question: str, data: dict) -> tuple[str | None
         return None, []
     raw = chat(
         task=task,
+        validate_answer=lambda text: guardrail_validate(text, data)["ok"],
         system=SYSTEM_PROMPT,
         user=f"Question: {question}\n\nENGINE DATA (the ONLY figures you may cite):\n{facts}",
     )

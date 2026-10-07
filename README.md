@@ -423,9 +423,24 @@ API_DOCS_ENABLED=true
 NVD_API_KEY=                  # optional — raises NVD rate limits
 
 # LLM advisor (optional)
-LLM_ENABLED=false
-LLM_BASE_URL= / LLM_API_KEY=
+LLM_ENABLED=true
+LLM_BASE_URL=https://openrouter.ai/api/v1
+LLM_MODEL=inclusionai/ling-3.0-flash-sante:free
+LLM_API_KEY=                 # add your OpenRouter API key
 ```
+
+The advisor uses the free Ling 3.0 Flash Sante chat model through OpenRouter for all language-model tasks.
+After adding or changing the key in `.env`, run `docker compose up -d backend`
+to load the new configuration. Template answers remain available if the key is
+missing or the provider is unavailable or rate-limited.
+
+For Groq's free tier, set `LLM_BASE_URL=https://api.groq.com/openai/v1`,
+`LLM_MODEL=openai/gpt-oss-120b`, and `LLM_API_KEY` to your Groq key instead.
+To use OpenRouter as a backup after Groq, also set `OPENROUTER_API_KEY` and
+optionally `OPENROUTER_MODEL` (defaults to the free Ling chat model). Requests
+try the primary provider, then OpenRouter, then template answers. Timeouts,
+rate limits, malformed responses, and rejected financial claims trigger failover.
+Keep API keys in the ignored `.env` file.
 
 ---
 

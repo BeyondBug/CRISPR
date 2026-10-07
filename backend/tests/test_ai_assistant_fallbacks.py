@@ -1,6 +1,16 @@
 from ai.assistant import query_engine
 
 
+def test_full_analysis_supplies_top_risk_total_as_verified_evidence(monkeypatch):
+    monkeypatch.setattr(query_engine.risk_tools, "get_enterprise_summary", lambda org: {"total_eal_inr": 600000})
+    monkeypatch.setattr(query_engine.risk_tools, "get_all_risks", lambda org: {"risks": [{"eal_inr": 200000}, {"eal_inr": 100000}]})
+    monkeypatch.setattr(query_engine, "load_assets", lambda org: [])
+    monkeypatch.setattr(query_engine, "load_findings", lambda **kwargs: [])
+    _, data = query_engine._answer_full_analysis("executive analysis", "org-1")
+    assert data["top_risks_total_eal_inr"] == 300000
+    assert query_engine.guardrail_validate("Top exposures total ₹3 lakh", data)["ok"]
+
+
 def test_drawer_presets_route_to_distinct_intents():
     prompts = {
         "Explain my highest-risk finding": "top_risk",
